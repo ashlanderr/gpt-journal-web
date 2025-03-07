@@ -1,0 +1,171 @@
+import { importDataToIndexedDB } from "./db.ts";
+import {
+  ChatItem,
+  ChatMessage,
+  ChatSummary,
+  useGetChat,
+  usePostMessage,
+} from "./ai.ts";
+import { MdSend } from "react-icons/md";
+import { useEffect, useState } from "react";
+import clsx from "clsx";
+
+const dateTimeFormat = new Intl.DateTimeFormat("ru", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function ImportData() {
+  const importData = (file: File) => {
+    console.log(file);
+
+    const reader = new FileReader();
+
+    reader.onload = async (e: ProgressEvent<FileReader>) => {
+      if (e.target?.result) {
+        try {
+          const jsonString = e.target.result as string;
+          const importedData = JSON.parse(jsonString) as {
+            version: string;
+            data: { message: any[]; summary: any[] };
+          };
+
+          console.log("Импортированные данные:", importedData);
+          await importDataToIndexedDB(importedData);
+        } catch (error) {
+          console.error("Ошибка при разборе JSON:", error);
+        }
+      }
+    };
+
+    reader.onerror = (error) => {
+      console.error("Ошибка чтения файла:", error);
+    };
+
+    reader.readAsText(file);
+  };
+
+  return (
+    <input type="file" onChange={(e) => importData(e.target.files!.item(0)!)} />
+  );
+}
+
+function MessageView({ message }: { message: ChatMessage }) {
+  return (
+    <div>
+      <div className="px-2 py-2 bg-gray-50 border-b border-gray-300">
+        <div className="pb-1 flex justify-between items-baseline">
+          <span>USER </span>
+          <span className="text-xs">
+            {dateTimeFormat.format(message.timestamp)}
+          </span>
+        </div>
+        <div className="whitespace-pre-wrap text-xs">{message.userContent}</div>
+      </div>
+      <div className="px-2 py-2 border-b border-gray-300">
+        <div className="pb-1">ASSISTANT</div>
+        <div className="whitespace-pre-wrap text-xs">
+          {message.assistantContent}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryView({ summary }: { summary: ChatSummary }) {
+  return (
+    <div className="px-2 py-2 border-b border-gray-300 bg-gray-50">
+      <div className="pb-1 flex justify-between items-baseline">
+        <span>SUMMARY </span>
+        <span className="text-xs">
+          {dateTimeFormat.format(summary.timestamp)}
+        </span>
+      </div>
+      <div className="whitespace-pre-wrap text-xs">{summary.content}</div>
+    </div>
+  );
+}
+
+function HeaderView() {
+  return (
+    <div className="sticky top-0 bg-white shadow px-2 py-2">GPT Journal</div>
+  );
+}
+
+function ChatView() {
+  const chat = useGetChat();
+
+  useEffect(() => {
+    window.scrollTo(0, document.body.scrollHeight);
+  }, [chat]);
+
+  return (
+    <div className="min-h-screen">
+      {chat.map((item) => {
+        if (item.type === "message")
+          return <MessageView key={item.id} message={item} />;
+        if (item.type === "summary")
+          return <SummaryView key={item.id} summary={item} />;
+        return null;
+      })}
+    </div>
+  );
+}
+
+function NewMessageView() {
+  const [value, setValue] = useState("");
+  const [isSending, setSending] = useState(false);
+  const canSend = value.trim() !== "" && !isSending;
+
+  const { execute: postMessage } = usePostMessage();
+
+  const send = async () => {
+    try {
+      setSending(true);
+      await postMessage(value);
+      setValue("");
+    } catch (e) {
+      console.error("Failed to send message", e);
+      alert("Ошибка при отправке сообщения");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="sticky bottom-0 bg-white px-2 py-2 flex gap-2">
+      <textarea
+        className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs"
+        placeholder="Сообщение"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <button
+        className={clsx({
+          "flex-0 p-2 rounded": true,
+          "bg-gray-300": !canSend,
+          "bg-blue-300": canSend,
+        })}
+        disabled={!canSend}
+        onClick={send}
+      >
+        <MdSend />
+      </button>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <HeaderView />
+      <ChatView />
+      <NewMessageView />
+    </div>
+  );
+}
+
+export default App;
