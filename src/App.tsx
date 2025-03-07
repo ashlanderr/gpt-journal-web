@@ -9,6 +9,7 @@ import {
 import { MdSend, MdSettings, MdUpload } from "react-icons/md";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
+import TextareaAutosize from "react-textarea-autosize";
 
 const dateTimeFormat = new Intl.DateTimeFormat("ru", {
   year: "numeric",
@@ -164,10 +165,12 @@ function NewMessageView() {
   };
 
   return (
-    <div className="sticky bottom-0 bg-white px-2 py-2 flex gap-2">
-      <textarea
+    <div className="sticky bottom-0 bg-white px-2 py-2 flex gap-2 items-start">
+      <TextareaAutosize
         className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs"
         placeholder="Сообщение"
+        minRows={2}
+        maxRows={8}
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />
