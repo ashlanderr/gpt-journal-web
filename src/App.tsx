@@ -7,7 +7,7 @@ import {
   usePostMessage,
 } from "./ai.ts";
 import { MdSend, MdSettings, MdUpload } from "react-icons/md";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import TextareaAutosize from "react-textarea-autosize";
 
@@ -43,9 +43,28 @@ function importData(file: File) {
   reader.readAsText(file);
 }
 
-function MessageView({ message }: { message: ChatMessage }) {
+function useScroll(enabled: boolean) {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    ref.current?.scrollIntoView({ behavior: "smooth" });
+  }, [enabled]);
+
+  return ref;
+}
+
+function MessageView({
+  message,
+  scroll,
+}: {
+  message: ChatMessage;
+  scroll: boolean;
+}) {
+  const scrollRef = useScroll(scroll);
+
   return (
-    <div>
+    <div ref={scrollRef}>
       <div className="px-2 py-2 bg-gray-50 border-b border-gray-300">
         <div className="pb-1 flex justify-between items-baseline">
           <span>USER </span>
@@ -65,9 +84,20 @@ function MessageView({ message }: { message: ChatMessage }) {
   );
 }
 
-function SummaryView({ summary }: { summary: ChatSummary }) {
+function SummaryView({
+  summary,
+  scroll,
+}: {
+  summary: ChatSummary;
+  scroll: boolean;
+}) {
+  const scrollRef = useScroll(scroll);
+
   return (
-    <div className="px-2 py-2 border-b border-gray-300 bg-gray-50">
+    <div
+      className="px-2 py-2 border-b border-gray-300 bg-gray-50"
+      ref={scrollRef}
+    >
       <div className="pb-1 flex justify-between items-baseline">
         <span>SUMMARY </span>
         <span className="text-xs">
@@ -127,17 +157,25 @@ function HeaderView() {
 function ChatView() {
   const chat = useGetChat();
 
-  useEffect(() => {
-    window.scrollTo(0, document.body.scrollHeight);
-  }, [chat]);
-
   return (
     <div className="min-h-screen">
-      {chat.map((item) => {
+      {chat.map((item, index) => {
         if (item.type === "message")
-          return <MessageView key={item.id} message={item} />;
+          return (
+            <MessageView
+              key={item.id}
+              message={item}
+              scroll={index === chat.length - 1}
+            />
+          );
         if (item.type === "summary")
-          return <SummaryView key={item.id} summary={item} />;
+          return (
+            <SummaryView
+              key={item.id}
+              summary={item}
+              scroll={index === chat.length - 1}
+            />
+          );
         return null;
       })}
     </div>
