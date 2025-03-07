@@ -1,12 +1,12 @@
-import { importDataToIndexedDB } from "./db.ts";
+import { importDataToIndexedDB, ImportedData } from "./db.ts";
 import {
-  ChatItem,
   ChatMessage,
   ChatSummary,
+  setOpenAiApiKey,
   useGetChat,
   usePostMessage,
 } from "./ai.ts";
-import { MdSend } from "react-icons/md";
+import { MdSend, MdSettings, MdUpload } from "react-icons/md";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 
@@ -18,39 +18,28 @@ const dateTimeFormat = new Intl.DateTimeFormat("ru", {
   minute: "2-digit",
 });
 
-function ImportData() {
-  const importData = (file: File) => {
-    console.log(file);
+function importData(file: File) {
+  const reader = new FileReader();
 
-    const reader = new FileReader();
+  reader.onload = async (e: ProgressEvent<FileReader>) => {
+    if (e.target?.result) {
+      try {
+        const jsonString = e.target.result as string;
+        const importedData = JSON.parse(jsonString) as ImportedData;
 
-    reader.onload = async (e: ProgressEvent<FileReader>) => {
-      if (e.target?.result) {
-        try {
-          const jsonString = e.target.result as string;
-          const importedData = JSON.parse(jsonString) as {
-            version: string;
-            data: { message: any[]; summary: any[] };
-          };
-
-          console.log("Импортированные данные:", importedData);
-          await importDataToIndexedDB(importedData);
-        } catch (error) {
-          console.error("Ошибка при разборе JSON:", error);
-        }
+        console.log("Импортированные данные:", importedData);
+        await importDataToIndexedDB(importedData);
+      } catch (error) {
+        console.error("Ошибка при разборе JSON:", error);
       }
-    };
-
-    reader.onerror = (error) => {
-      console.error("Ошибка чтения файла:", error);
-    };
-
-    reader.readAsText(file);
+    }
   };
 
-  return (
-    <input type="file" onChange={(e) => importData(e.target.files!.item(0)!)} />
-  );
+  reader.onerror = (error) => {
+    console.error("Ошибка чтения файла:", error);
+  };
+
+  reader.readAsText(file);
 }
 
 function MessageView({ message }: { message: ChatMessage }) {
@@ -90,8 +79,47 @@ function SummaryView({ summary }: { summary: ChatSummary }) {
 }
 
 function HeaderView() {
+  const openSettings = () => {
+    const key = prompt("OpenAI API Key");
+    if (key) {
+      setOpenAiApiKey(key);
+    }
+  };
+
+  const importDb = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json";
+
+    input.onchange = () => {
+      const file = input.files?.item(0);
+      if (file) importData(file);
+    };
+
+    try {
+      document.body.appendChild(input);
+      input.click();
+    } finally {
+      document.body.removeChild(input);
+    }
+  };
+
   return (
-    <div className="sticky top-0 bg-white shadow px-2 py-2">GPT Journal</div>
+    <div className="sticky top-0 bg-white shadow px-2 py-1 flex items-center gap-2">
+      <div className="flex-1">GPT Journal</div>
+      <button
+        className="p-2 bg-gray-100 rounded active:bg-gray-400"
+        onClick={importDb}
+      >
+        <MdUpload />
+      </button>
+      <button
+        className="p-2 bg-gray-100 rounded active:bg-gray-400"
+        onClick={openSettings}
+      >
+        <MdSettings />
+      </button>
+    </div>
   );
 }
 

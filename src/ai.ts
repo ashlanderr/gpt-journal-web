@@ -68,9 +68,15 @@ interface CompletionChoice {
 
 const OPENAI_BASE_URL = "https://api.proxyapi.ru/openai/v1";
 
-const OPENAI_API_KEY = "..."; // todo REMOVE
-
 const CHAT_SYSTEM_PROPMT = `You are ChatGPT, a supportive and empathetic assistant helping the user to maintain a personal journal. Your role is to encourage self-reflection, provide constructive feedback, and prompt the user with questions that deepen their understanding of their thoughts and emotions. Ensure confidentiality and create a safe, non-judgmental space for expression. Guide the user towards clarity and personal growth by suggesting insights and encouraging positive, actionable steps.`;
+
+export function setOpenAiApiKey(key: string) {
+  localStorage.setItem("OPENAI_API_KEY", key);
+}
+
+function getOpenAiApiKey() {
+  return localStorage.getItem("OPENAI_API_KEY");
+}
 
 interface ChatCompletionRequest {
   model: string;
@@ -92,7 +98,7 @@ async function createChatCompletion(
     body,
     {
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${getOpenAiApiKey()}`,
       },
     },
   );
@@ -113,7 +119,7 @@ async function createTextEmbedding(input: string): Promise<EmbeddingResponse> {
   };
   const { data } = await axios.post(`${OPENAI_BASE_URL}/embeddings`, body, {
     headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${getOpenAiApiKey()}`,
     },
   });
   return data;

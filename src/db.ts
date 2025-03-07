@@ -43,7 +43,7 @@ interface ImportedSummary {
   parent_id: string | null;
 }
 
-interface ImportedData {
+export interface ImportedData {
   version: string;
   data: {
     message: ImportedMessage[];
