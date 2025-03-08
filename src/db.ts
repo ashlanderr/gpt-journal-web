@@ -1,3 +1,5 @@
+import { openDB } from "idb";
+
 export function initDB() {
   const request = indexedDB.open("gpt_journal", 1);
 
@@ -70,55 +72,67 @@ export interface DBSummary {
   parentId: string | "NULL";
 }
 
-export function importDataToIndexedDB(
+export async function importDataToIndexedDB(
   importedData: ImportedData,
 ): Promise<void> {
   const convertedData = convertImportedData(importedData);
+  const db = await openDB("gpt_journal", 1);
+  const transaction = db.transaction(["summary", "message"], "readwrite");
+  const summaryStore = transaction.objectStore("summary");
+  const messageStore = transaction.objectStore("message");
 
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open("gpt_journal", 1);
+  await summaryStore.clear();
+  await messageStore.clear();
 
-    request.onerror = () => {
-      console.error("Ошибка открытия IndexedDB:", request.error);
-      reject(request.error);
-    };
+  for (const summary of convertedData.summary) {
+    await summaryStore.put(summary);
+  }
 
-    request.onsuccess = () => {
-      const db = request.result;
+  for (const message of convertedData.message) {
+    await messageStore.put(message);
+  }
+}
 
-      // Открываем транзакцию сразу для двух хранилищ с правами на запись
-      const transaction = db.transaction(["summary", "message"], "readwrite");
+export async function exportDataFromIndexedDB(): Promise<ImportedData> {
+  const db = await openDB("gpt_journal", 1);
+  const transaction = db.transaction(["summary", "message"], "readonly");
+  const summaryStore = transaction.objectStore("summary");
+  const messageStore = transaction.objectStore("message");
 
-      transaction.onerror = () => {
-        console.error("Ошибка транзакции:", transaction.error);
-        reject(transaction.error);
-      };
+  const result: ImportedData = {
+    version: "1",
+    data: {
+      summary: [],
+      message: [],
+    },
+  };
 
-      transaction.oncomplete = () => {
-        console.log("Импорт данных завершен успешно.");
-        resolve();
-      };
+  for await (const cursor of summaryStore) {
+    const summary = cursor.value as DBSummary;
+    result.data.summary.push({
+      id: summary.id,
+      date_from: summary.dateFrom.toISOString(),
+      date_to: summary.dateTo.toISOString(),
+      content: summary.content,
+      level: summary.level,
+      tokens_count: summary.tokensCount,
+      parent_id: summary.parentId !== "NULL" ? summary.parentId : null,
+    });
+  }
 
-      const summaryStore = transaction.objectStore("summary");
-      const messageStore = transaction.objectStore("message");
+  for await (const cursor of messageStore) {
+    const message = cursor.value as DBMessage;
+    result.data.message.push({
+      id: message.id,
+      created_at: message.createdAt.toISOString(),
+      user_content: message.userContent,
+      assistant_content: message.assistantContent,
+      tokens_count: message.tokensCount,
+      summary_id: message.summaryId !== "NULL" ? message.summaryId : null,
+    });
+  }
 
-      // Вставляем данные в хранилище summary
-      convertedData.summary.forEach((summaryItem) => {
-        const req = summaryStore.put(summaryItem);
-        req.onerror = () => {
-          console.error("Ошибка вставки summary:", req.error);
-        };
-      });
-
-      // Вставляем данные в хранилище message
-      convertedData.message.forEach((messageItem) => {
-        const req = messageStore.put(messageItem);
-        req.onerror = () => {
-          console.error("Ошибка вставки message:", req.error);
-        };
-      });
-    };
-  });
+  return result;
 }
 
 function convertImportedData(importedData: ImportedData): {

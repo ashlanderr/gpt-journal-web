@@ -1,4 +1,8 @@
-import { importDataToIndexedDB, ImportedData } from "./db.ts";
+import {
+  exportDataFromIndexedDB,
+  importDataToIndexedDB,
+  ImportedData,
+} from "./db.ts";
 import {
   ChatMessage,
   ChatSummary,
@@ -6,10 +10,12 @@ import {
   useGetChat,
   usePostMessage,
 } from "./ai.ts";
-import { MdSend, MdSettings, MdUpload } from "react-icons/md";
+import { MdDownload, MdSend, MdSettings, MdUpload } from "react-icons/md";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import TextareaAutosize from "react-textarea-autosize";
+import { saveAs } from "file-saver";
+import { useQueryClient } from "@tanstack/react-query";
 
 const dateTimeFormat = new Intl.DateTimeFormat("ru", {
   year: "numeric",
@@ -19,28 +25,23 @@ const dateTimeFormat = new Intl.DateTimeFormat("ru", {
   minute: "2-digit",
 });
 
-function importData(file: File) {
-  const reader = new FileReader();
-
-  reader.onload = async (e: ProgressEvent<FileReader>) => {
-    if (e.target?.result) {
-      try {
-        const jsonString = e.target.result as string;
-        const importedData = JSON.parse(jsonString) as ImportedData;
-
-        console.log("Импортированные данные:", importedData);
-        await importDataToIndexedDB(importedData);
-      } catch (error) {
-        console.error("Ошибка при разборе JSON:", error);
+async function importData(file: File) {
+  const jsonString = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      if (e.target?.result) {
+        resolve(e.target.result as string);
       }
-    }
-  };
+    };
+    reader.onerror = (error) => {
+      reject(error);
+    };
+    reader.readAsText(file);
+  });
 
-  reader.onerror = (error) => {
-    console.error("Ошибка чтения файла:", error);
-  };
-
-  reader.readAsText(file);
+  const importedData = JSON.parse(jsonString) as ImportedData;
+  console.log("Импортированные данные:", importedData);
+  await importDataToIndexedDB(importedData);
 }
 
 function useScroll(enabled: boolean) {
@@ -110,6 +111,8 @@ function SummaryView({
 }
 
 function HeaderView() {
+  const queryClient = useQueryClient();
+
   const openSettings = () => {
     const key = prompt("OpenAI API Key");
     if (key) {
@@ -122,9 +125,16 @@ function HeaderView() {
     input.type = "file";
     input.accept = "application/json";
 
-    input.onchange = () => {
-      const file = input.files?.item(0);
-      if (file) importData(file);
+    input.onchange = async () => {
+      try {
+        const file = input.files?.item(0);
+        if (file) await importData(file);
+        await queryClient.invalidateQueries({
+          queryKey: ["chat"],
+        });
+      } catch (error) {
+        console.error("Failed to import data", error);
+      }
     };
 
     try {
@@ -135,9 +145,22 @@ function HeaderView() {
     }
   };
 
+  const exportDb = async () => {
+    const data = await exportDataFromIndexedDB();
+    const str = JSON.stringify(data, null, 2);
+    const blob = new Blob([str], { type: "application/json;charset=utf-8" });
+    saveAs(blob, "journal.json");
+  };
+
   return (
     <div className="sticky top-0 bg-white shadow px-2 py-1 flex items-center gap-2">
       <div className="flex-1">GPT Journal</div>
+      <button
+        className="p-2 bg-gray-100 rounded active:bg-gray-400"
+        onClick={exportDb}
+      >
+        <MdDownload />
+      </button>
       <button
         className="p-2 bg-gray-100 rounded active:bg-gray-400"
         onClick={importDb}
