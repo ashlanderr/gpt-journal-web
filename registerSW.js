@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/gpt-journal-web/sw.js', { scope: '/gpt-journal-web/' })})}
