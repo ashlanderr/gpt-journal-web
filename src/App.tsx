@@ -228,10 +228,9 @@ function NewMessageView() {
   return (
     <div className="sticky bottom-0 bg-white px-2 py-2 flex gap-2 items-start">
       <TextareaAutosize
-        className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs"
+        className="flex-1 border border-gray-300 rounded px-2 py-1 text-base"
         placeholder="Сообщение"
         minRows={2}
-        maxRows={8}
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />
